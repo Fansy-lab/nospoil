@@ -202,18 +202,18 @@
   // its own closed shadow root on <html> (it can't be a child of the blocked
   // element, or it would be blurred too) and follows the element on scroll/resize.
   const PROMPT_CSS = `
-    .box { box-sizing: border-box; width: 100%; height: 100%; display: flex; flex-wrap: wrap;
-           align-items: center; justify-content: center; gap: 8px; padding: 6px 10px;
-           background: rgba(20, 20, 24, .78); color: #fff; border-radius: 8px;
-           font: 13px/1.3 system-ui, sans-serif; text-align: center; overflow: hidden; }
+    .box { box-sizing: border-box; display: flex; flex-wrap: wrap; align-content: center;
+           align-items: center; justify-content: center; gap: 8px; padding: 8px 12px;
+           background: rgba(20, 20, 24, .88); color: #fff; border-radius: 8px;
+           font: 13px/1.3 system-ui, sans-serif; text-align: center; user-select: none;
+           box-shadow: 0 2px 10px rgba(0, 0, 0, .35); }
+    .box > span { white-space: nowrap; }
     .btns { display: flex; gap: 6px; }
-    button { font: inherit; padding: 4px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,.5);
+    button { white-space: nowrap; font: inherit; padding: 4px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,.5);
              background: transparent; color: #fff; cursor: pointer; }
     button.yes { background: #fff; color: #111; border-color: #fff; }
     button:hover { opacity: .85; }
   `;
-  const PROMPT_MIN_W = 230;
-  const PROMPT_MIN_H = 40;
   let prompt = null; // { host, target }
   let placeQueued = false;
 
@@ -223,20 +223,22 @@
     const { host, target } = prompt;
     if (!target.isConnected || target.getAttribute(ATTR) !== 'blur') return closePrompt();
     const r = target.getBoundingClientRect();
-    // Cover the visible part of the element, with a minimum size for tiny ones.
+    // Cover the visible part of the element. The panel is at least that big but
+    // grows to fit its own content, so on small elements it overflows their
+    // edges (centred) instead of clipping the buttons.
     const left = Math.max(r.left, 0);
     const top = Math.max(r.top, 0);
     const right = Math.min(r.right, window.innerWidth);
     const bottom = Math.min(r.bottom, window.innerHeight);
     if (right <= left || bottom <= top) return closePrompt(); // scrolled out of view
-    const w = Math.max(right - left, PROMPT_MIN_W);
-    const h = Math.max(bottom - top, PROMPT_MIN_H);
-    const x = Math.min(Math.max((left + right) / 2 - w / 2, 4), Math.max(window.innerWidth - w - 4, 4));
-    const y = (top + bottom) / 2 - h / 2;
-    host.style.left = `${x}px`;
-    host.style.top = `${y}px`;
-    host.style.width = `${w}px`;
-    host.style.height = `${h}px`;
+    host.style.minWidth = `${right - left}px`;
+    host.style.minHeight = `${bottom - top}px`;
+    const w = host.offsetWidth;
+    const h = host.offsetHeight;
+    const clamp = (v, size, max) => Math.max(Math.min(v, max - size), 0); // keep on screen
+    const x = clamp((left + right) / 2 - w / 2, w, window.innerWidth);
+    const y = clamp((top + bottom) / 2 - h / 2, h, window.innerHeight);
+    host.style.transform = `translate(${x}px, ${y}px)`;
   }
 
   function queuePlace() {
@@ -261,7 +263,10 @@
   function openPrompt(target) {
     closePrompt();
     const host = document.createElement('div');
-    host.style.cssText = 'all: initial; position: fixed; z-index: 2147483647;';
+    // Pinned at 0,0 and moved with a transform so its shrink-to-fit width is
+    // measured against the whole viewport; grid makes the panel fill min sizes.
+    host.style.cssText = 'all: initial; position: fixed; left: 0; top: 0; z-index: 2147483647; '
+      + 'display: grid; box-sizing: border-box; max-width: 100vw;';
     const root = host.attachShadow({ mode: 'closed' });
 
     const style = document.createElement('style');
