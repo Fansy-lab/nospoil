@@ -1,0 +1,12 @@
+/* Keep in sync with SHADOW_CSS in content.js */
+[data-nospoil="hide"] {
+  display: none !important;
+}
+[data-nospoil="blur"] {
+  filter: blur(16px) grayscale(1) !important;
+  cursor: pointer !important;
+  user-select: none !important;
+}
+[data-nospoil="blur"] * {
+  pointer-events: none !important;
+}
